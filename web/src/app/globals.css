@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
+All colors MUST be HSL.
+*/
+
+::selection {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+::-moz-selection {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+@layer base {
+  :root {
+    /* Pizza Playground design system - Warm, Inviting, Artisan */
+    
+    /* Primary - Warm creamy off-white background */
+    --background: 30 20% 97%;
+    --foreground: 220 20% 25%;
+
+    /* Card backgrounds - slightly whiter than main background */
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 25%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 25%;
+
+    /* Primary - Muted terracotta for main CTAs */
+    --primary: 12 50% 65%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Sage green for freshness */
+    --secondary: 120 20% 60%;
+    --secondary-foreground: 220 20% 25%;
+
+    /* Muted backgrounds and text */
+    --muted: 30 15% 92%;
+    --muted-foreground: 220 15% 50%;
+    
+    /* Success - for ready/completed status */
+    --success: 145 63% 49%;
+
+    /* Accent - Warm peach for highlights */
+    --accent: 25 85% 75%;
+    --accent-foreground: 220 20% 25%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders - soft and subtle */
+    --border: 30 12% 88%;
+    --input: 30 12% 88%;
+    --ring: 12 50% 65%;
+
+    /* More rounded corners for friendly feel */
+    --radius: 0.75rem;
+
+    /* Custom tokens for pizza website */
+    --hero-gradient: linear-gradient(135deg, hsl(12, 50%, 65%) 0%, hsl(25, 85%, 75%) 100%);
+    --card-shadow: 0 2px 12px -4px hsl(220 20% 25% / 0.08);
+    --card-shadow-hover: 0 4px 20px -4px hsl(220 20% 25% / 0.12);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 220 25% 12%;
+    --foreground: 30 20% 95%;
+
+    --card: 220 25% 15%;
+    --card-foreground: 30 20% 95%;
+
+    --popover: 220 25% 15%;
+    --popover-foreground: 30 20% 95%;
+
+    --primary: 12 50% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 120 20% 45%;
+    --secondary-foreground: 30 20% 95%;
+
+    --muted: 220 20% 20%;
+    --muted-foreground: 30 10% 65%;
+
+    --accent: 25 75% 65%;
+    --accent-foreground: 220 25% 12%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 25%;
+    --input: 220 20% 25%;
+    --ring: 12 50% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer utilities {
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:opacity-90 transition-all duration-300;
+  }
+
+  .btn-accent {
+    @apply bg-accent text-accent-foreground hover:opacity-90 transition-all duration-300;
+  }
+
+  /* Loading animations */
+  @keyframes spin-smooth {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes pulse-smooth {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  @keyframes fade-in-up {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-spin-smooth {
+    animation: spin-smooth 1s linear infinite;
+  }
+
+  .animate-pulse-smooth {
+    animation: pulse-smooth 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.6) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-hover {
+    @apply transition-none hover:shadow-lg hover:translate-y-0;
+  }
+
+  .animate-spin-smooth,
+  .animate-pulse-smooth,
+  .animate-shimmer,
+  .animate-fade-in-up {
+    animation: none !important;
+  }
+
+  /* Tailwind animate-* utilities from Tailwind config */
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-accordion-down,
+  .animate-accordion-up {
+    animation: none !important;
+  }
+}
