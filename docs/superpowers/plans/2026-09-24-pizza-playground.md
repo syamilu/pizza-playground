@@ -4,7 +4,7 @@
 
 **Goal:** A `docker compose up` pizza ordering app (Next.js UI, Spring Boot API, Postgres, SoapUI mock payment gateway) that the Testing Knowledge Base uses as its JMeter, k6 and Playwright target.
 
-**Architecture:** One Spring Boot 3 service with package-per-feature (`common`, `auth`, `catalog`, `orders`, `payments`, `admin`) over Postgres with Flyway. The Next.js UI is copied from the source project at `/Users/syamilu/Desktop/Projects/2026/PizzaDiablo/pizzadiablo` with every Firebase call replaced by one fetch wrapper. Payment is a SoapUI REST MockService that hosts a pay page and posts an HMAC-signed callback.
+**Architecture:** One Spring Boot 3 service with package-per-feature (`common`, `auth`, `catalog`, `orders`, `payments`, `admin`) over Postgres with Flyway. The Next.js UI is copied from the source project with every Firebase call replaced by one fetch wrapper. Payment is a SoapUI REST MockService that hosts a pay page and posts an HMAC-signed callback.
 
 **Tech Stack:** Java 21 target (JDK 26 installed, so `maven.compiler.release=21`, no Lombok), Spring Boot 3.5.x, Spring Security + jjwt 0.12, Spring Data JPA, Flyway, Postgres 16, springdoc-openapi 2.8, Testcontainers, JUnit 5, Next.js 15, Vitest, SoapUI 5.7.2 open source, Docker Compose.
 
@@ -746,7 +746,7 @@ Then run `nc -l 9999` (or `python3 -m http.server 9999`) in another shell, `curl
 - [ ] **Step 1: Copy and strip**
 
 ```bash
-SRC=/Users/syamilu/Desktop/Projects/2026/PizzaDiablo/pizzadiablo
+SRC=<the source project's directory>
 mkdir -p web && cd web
 cp -R $SRC/src $SRC/package.json $SRC/package-lock.json $SRC/next.config.js $SRC/tsconfig.json $SRC/tailwind.config.ts $SRC/postcss.config.js $SRC/components.json $SRC/vitest.config.ts $SRC/eslint.config.js $SRC/next-env.d.ts .
 mkdir -p public tests/unit && cp $SRC/public/placeholder.svg $SRC/public/robots.txt public/

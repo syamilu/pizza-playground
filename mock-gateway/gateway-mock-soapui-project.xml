@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:soapui-project name="PizzaPaymentGateway" soapui-version="5.7.2" xmlns:con="http://eviware.com/soapui/config">
+  <con:settings/>
+  <con:restMockService name="PaymentGatewayMock" port="8090" path="/" host="localhost" id="payment-gateway-mock">
+    <con:settings/>
+    <!-- Runs before every request: honour X-Mock-Delay (ms, capped at 30000). -->
+    <con:startScript><![CDATA[
+// SoapUI's embedded Jetty 6 keeps the 4 KB default header buffer, so a browser with a few
+// cookies on localhost gets HTTP 413. Jetty is started after this script returns, so raise
+// the buffer from a background thread once the connector exists. New connections pick it up.
+Thread.start {
+    def engine = com.eviware.soapui.SoapUI.getMockEngine()
+    def f = engine.class.getDeclaredField("connectors"); f.accessible = true
+    for (int i = 0; i < 150; i++) {
+        def map = f.get(engine)
+        if (map && !map.isEmpty()) {
+            // The public setters throw IllegalStateException once Jetty is started, so poke the fields.
+            def cls = org.mortbay.jetty.AbstractBuffers
+            ["_headerBufferSize", "_requestBufferSize"].each { name ->
+                def bf = cls.getDeclaredField(name); bf.accessible = true
+                map.values().each { c -> bf.setInt(c, 65536) }
+            }
+            log.info("mock gateway: jetty header buffer raised to 64 KB")
+            return
+        }
+        Thread.sleep(200)
+    }
+    log.warn("mock gateway: could not find jetty connector to raise header buffer")
+}
+]]></con:startScript>
+    <con:onRequestScript><![CDATA[
+def delay = mockRequest.httpRequest.getHeader("X-Mock-Delay")
+if (delay?.trim()?.isLong()) Thread.sleep(Math.min(Math.max(delay.trim().toLong(), 0L), 30000L))
+// Root landing page so a browser at http://localhost:8090/ sees something instead of an empty 404.
+def path = mockRequest.httpRequest.pathInfo ?: mockRequest.path
+if (mockRequest.method.toString() == "GET" && (path == "/" || path == "")) {
+    def r = mockRequest.httpResponse
+    r.status = 200
+    r.contentType = "text/html; charset=utf-8"
+    r.writer.write("""<!doctype html><html><head><meta charset="utf-8"><title>Mock Payment Gateway</title></head>
+<body style="font-family:sans-serif;max-width:40em;margin:3em auto">
+<h1>Mock Payment Gateway</h1>
+<p>This is the SoapUI mock the Pizza Playground API pays through. It has no home page; the API sends you to a pay page when you check out.</p>
+<ul>
+<li><code>POST /bills</code> - create a bill (called by the API)</li>
+<li><code>GET /pay/&lt;billId&gt;</code> - hosted pay page with Pay and Fail buttons</li>
+<li><code>POST /pay/&lt;billId&gt;</code> - signs and posts the callback to the API</li>
+</ul>
+<p>Header <code>X-Mock-Delay: &lt;ms&gt;</code> slows any request. See <code>mock-gateway/README.md</code>.</p>
+</body></html>""")
+    r.writer.flush()
+    return new com.eviware.soapui.impl.rest.mock.RestMockResult(mockRequest)
+}
+]]></con:onRequestScript>
+
+    <!-- POST /bills: create a bill for an order and return its pay URL. -->
+    <con:restMockAction name="Create bill" method="POST" resourcePath="/bills">
+      <con:settings/>
+      <con:defaultResponse>Created</con:defaultResponse>
+      <con:dispatchStyle>SCRIPT</con:dispatchStyle>
+      <con:dispatchPath><![CDATA[
+import java.math.RoundingMode
+import java.util.concurrent.ConcurrentHashMap
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+// Bill store: one map per JVM, shared by every action (each action's script has its own classloader).
+def bills = System.properties.computeIfAbsent("pizza.bills") { new ConcurrentHashMap() }
+
+def req = new JsonSlurper().parseText(mockRequest.requestContent)
+def orderId = req.orderId.toString().toLowerCase()
+def id = "bill_" + orderId.take(8) + "_" + System.currentTimeMillis()
+bills[id] = [
+    orderId    : orderId,
+    amount     : new BigDecimal(req.amount.toString()).setScale(2, RoundingMode.HALF_UP).toPlainString(),
+    redirectUrl: req.redirectUrl,
+    callbackUrl: req.callbackUrl]
+log.info("created " + id + " for order " + orderId + " amount " + bills[id].amount)
+requestContext.body = JsonOutput.toJson([id: id, url: "http://localhost:8090/pay/" + id])
+return "Created"
+]]></con:dispatchPath>
+      <con:response name="Created" httpResponseStatus="200" mediaType="application/json">
+        <con:settings/>
+        <con:responseContent>${body}</con:responseContent>
+      </con:response>
+    </con:restMockAction>
+
+    <!-- GET /pay/{billId}: the hosted payment page. Matched by prefix: /pay matches /pay/anything. -->
+    <con:restMockAction name="Pay page" method="GET" resourcePath="/pay">
+      <con:settings/>
+      <con:defaultResponse>Unknown bill</con:defaultResponse>
+      <con:dispatchStyle>SCRIPT</con:dispatchStyle>
+      <con:dispatchPath><![CDATA[
+import java.util.concurrent.ConcurrentHashMap
+import groovy.xml.XmlUtil
+
+def bills = System.properties.computeIfAbsent("pizza.bills") { new ConcurrentHashMap() }
+def id = mockRequest.path.tokenize("/").last()
+def bill = bills[id]
+if (!bill) return "Unknown bill"
+
+def e = { XmlUtil.escapeXml(it.toString()) }
+def action = "/pay/" + e(id)
+requestContext.page = """<!doctype html>
+<html><head><meta charset="utf-8"><title>Mock Payment Gateway</title></head>
+<body>
+<h1>Mock Payment Gateway</h1>
+<p>Bill: <span id="bill-id">${e(id)}</span></p>
+<p>Order: <span id="order-id">${e(bill.orderId)}</span></p>
+<p>Amount: <span id="amount">${e(bill.amount)}</span></p>
+<form method="post" action="${action}"><input type="hidden" name="action" value="pay"><button id="pay-button" type="submit">Pay</button></form>
+<form method="post" action="${action}"><input type="hidden" name="action" value="fail"><button id="fail-button" type="submit">Fail payment</button></form>
+</body></html>"""
+return "Page"
+]]></con:dispatchPath>
+      <con:response name="Page" httpResponseStatus="200" mediaType="text/html">
+        <con:settings/>
+        <con:responseContent>${page}</con:responseContent>
+      </con:response>
+      <con:response name="Unknown bill" httpResponseStatus="404" mediaType="application/json">
+        <con:settings/>
+        <con:responseContent>{"error":"unknown bill"}</con:responseContent>
+      </con:response>
+    </con:restMockAction>
+
+    <!-- POST /pay/{billId}: action=pay|fail. Sends the signed callback to the API, then redirects the browser. -->
+    <con:restMockAction name="Pay submit" method="POST" resourcePath="/pay">
+      <con:settings/>
+      <con:defaultResponse>Unknown bill</con:defaultResponse>
+      <con:dispatchStyle>SCRIPT</con:dispatchStyle>
+      <con:dispatchPath><![CDATA[
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+
+def bills = System.properties.computeIfAbsent("pizza.bills") { new ConcurrentHashMap() }
+def id = mockRequest.path.tokenize("/").last()
+def bill = bills[id]
+if (!bill) return "Unknown bill"
+
+def form = (mockRequest.requestContent ?: "").tokenize("&").collectEntries {
+    def kv = it.split("=", 2)
+    [(URLDecoder.decode(kv[0], "UTF-8")): kv.length > 1 ? URLDecoder.decode(kv[1], "UTF-8") : ""]
+}
+def fields = [
+    amount  : bill.amount,
+    id      : id,
+    order_id: bill.orderId,
+    paid    : (form.action == "pay").toString(),
+    paid_at : Instant.now().truncatedTo(ChronoUnit.SECONDS).toString()]
+
+// Must match the API's SignatureService byte for byte: sorted keys, key=value, joined by "|".
+def signed = ["amount", "id", "order_id", "paid", "paid_at"].collect { it + "=" + fields[it] }.join("|")
+def key = System.getenv("GATEWAY_SIGNATURE_KEY") ?: "mock-signature-key"
+def mac = Mac.getInstance("HmacSHA256")
+mac.init(new SecretKeySpec(key.getBytes("UTF-8"), "HmacSHA256"))
+fields.x_signature = mac.doFinal(signed.getBytes("UTF-8")).encodeHex().toString()
+
+def body = fields.collect { k, v -> URLEncoder.encode(k, "UTF-8") + "=" + URLEncoder.encode(v, "UTF-8") }.join("&")
+def url = System.getenv("API_CALLBACK_URL") ?: bill.callbackUrl
+try {
+    def resp = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(5)).build()
+        .send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+            HttpResponse.BodyHandlers.ofString())
+    if (resp.statusCode() == 200) log.info("callback " + id + " paid=" + fields.paid + " -> 200")
+    else log.warn("callback " + id + " -> " + resp.statusCode() + " " + resp.body())
+} catch (Exception ex) {
+    log.warn("callback " + id + " to " + url + " failed: " + ex)
+}
+requestContext.location = bill.redirectUrl
+return "Redirect"
+]]></con:dispatchPath>
+      <con:response name="Redirect" httpResponseStatus="302" mediaType="text/plain">
+        <con:settings/>
+        <con:responseContent/>
+        <con:header><con:name>Location</con:name><con:value>${location}</con:value></con:header>
+      </con:response>
+      <con:response name="Unknown bill" httpResponseStatus="404" mediaType="application/json">
+        <con:settings/>
+        <con:responseContent>{"error":"unknown bill"}</con:responseContent>
+      </con:response>
+    </con:restMockAction>
+  </con:restMockService>
+  <con:properties/>
+  <con:wssContainer/>
+</con:soapui-project>

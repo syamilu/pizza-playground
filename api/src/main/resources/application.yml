@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/playground}
+    username: ${SPRING_DATASOURCE_USERNAME:playground}
+    password: ${SPRING_DATASOURCE_PASSWORD:playground}
+  jpa:
+    hibernate.ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  http.client:
+    # applied to the auto-configured RestClient.Builder that GatewayClient uses
+    connect-timeout: 2s
+    read-timeout: 10s
+management:
+  endpoints.web.exposure.include: health
+playground:
+  jwt-secret: ${JWT_SECRET:change-me-but-it-works-as-is-0123456789abcdef}
+  gateway-signature-key: ${GATEWAY_SIGNATURE_KEY:mock-signature-key}
+  mock-gateway-url: ${MOCK_GATEWAY_URL:http://localhost:8090}
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:3000}
+  callback-url: ${CALLBACK_URL:http://localhost:8080/api/v1/payments/callback}

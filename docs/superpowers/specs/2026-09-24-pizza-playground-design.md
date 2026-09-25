@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-A self-contained pizza ordering application that anyone can run locally with `docker compose up` and use as the target for the Testing Knowledge Base tracks: JMeter, k6 and Playwright. It replaces the Firebase and Billplz dependencies of the original PizzaDiablo project with a real backend, a real database and a mocked payment gateway, so no cloud accounts are needed.
+A self-contained pizza ordering application that anyone can run locally with `docker compose up` and use as the target for the Testing Knowledge Base tracks: JMeter, k6 and Playwright. It replaces the Firebase and Billplz dependencies of the source project with a real backend, a real database and a mocked payment gateway, so no cloud accounts are needed.
 
 **Success looks like**
 - `docker compose up` on a clean machine gives a working shop at `http://localhost:3000`, an API with Swagger UI at `http://localhost:8080/swagger-ui.html`, and a mock gateway.
