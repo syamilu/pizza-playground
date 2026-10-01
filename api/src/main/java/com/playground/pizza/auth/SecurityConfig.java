@@ -3,6 +3,7 @@ package com.playground.pizza.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import com.playground.pizza.common.PlaygroundProperties;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -33,10 +34,10 @@ public class SecurityConfig {
   }
 
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
+  public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter, PlaygroundProperties props) throws Exception {
     http
         .csrf(AbstractHttpConfigurer::disable)
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .cors(cors -> cors.configurationSource(corsConfigurationSource(props.publicBaseUrl())))
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
@@ -64,9 +65,9 @@ public class SecurityConfig {
     res.getWriter().write("{\"error\":\"" + error + "\",\"requestId\":\"" + id + "\"}");
   }
 
-  private CorsConfigurationSource corsConfigurationSource() {
+  private CorsConfigurationSource corsConfigurationSource(String publicBaseUrl) {
     CorsConfiguration config = new CorsConfiguration();
-    config.setAllowedOrigins(List.of("http://localhost:3000"));
+    config.setAllowedOrigins(List.of("http://localhost:3000", publicBaseUrl));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
