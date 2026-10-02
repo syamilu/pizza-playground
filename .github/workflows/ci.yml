@@ -1,0 +1,113 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: web } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: npm ci
+      - run: npx vitest run
+
+  api:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: api } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with: { distribution: temurin, java-version: 21, cache: maven }
+      - run: mvn -B verify
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - run: cp .env.example .env
+      - run: docker compose up -d --build
+      - run: bash scripts/smoke.sh
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
+
+  deploy:
+    needs: [web, api, smoke]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: production
+    permissions: { contents: read, packages: write }
+    env:
+      REGISTRY: ghcr.io/${{ github.repository }}
+      HOST: ${{ secrets.VPS_HOST }}
+      DOMAIN: ${{ secrets.DOMAIN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: docker/build-push-action@v7
+        with:
+          context: api
+          push: true
+          tags: ${{ env.REGISTRY }}/api:latest,${{ env.REGISTRY }}/api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - uses: docker/build-push-action@v7
+        with:
+          context: mock-gateway
+          push: true
+          tags: ${{ env.REGISTRY }}/mock-gateway:latest,${{ env.REGISTRY }}/mock-gateway:${{ github.sha }}
+          cache-from: type=gha,scope=mock-gateway
+          cache-to: type=gha,mode=max,scope=mock-gateway
+      - uses: docker/build-push-action@v7
+        with:
+          context: web
+          push: true
+          # baked into the browser bundle at build time, so it must be the public API address
+          build-args: NEXT_PUBLIC_API_URL=https://${{ env.DOMAIN }}
+          tags: ${{ env.REGISTRY }}/web:latest,${{ env.REGISTRY }}/web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Deploy to VPS
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          USER: ${{ secrets.VPS_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          GATEWAY_SIGNATURE_KEY: ${{ secrets.GATEWAY_SIGNATURE_KEY }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          install -m 600 /dev/null ~/.ssh_key && echo "$SSH_KEY" > ~/.ssh_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh_known_hosts
+          SSH="ssh -i $HOME/.ssh_key -o UserKnownHostsFile=$HOME/.ssh_known_hosts $USER@$HOST"
+          DIR=pizza-playground
+          $SSH "mkdir -p $DIR"
+          scp -i ~/.ssh_key -o UserKnownHostsFile=~/.ssh_known_hosts docker-compose.yml docker-compose.prod.yml "$USER@$HOST:$DIR/"
+          cat > .env.prod <<ENV
+          POSTGRES_USER=playground
+          POSTGRES_DB=playground
+          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+          JWT_SECRET=$JWT_SECRET
+          GATEWAY_SIGNATURE_KEY=$GATEWAY_SIGNATURE_KEY
+          MOCK_GATEWAY_URL=http://mock-gateway:8090
+          PUBLIC_BASE_URL=https://$DOMAIN
+          PUBLIC_GATEWAY_URL=https://$DOMAIN
+          NEXT_PUBLIC_API_URL=https://$DOMAIN
+          IMAGE_TAG=${{ github.sha }}
+          COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+          ENV
+          scp -i ~/.ssh_key -o UserKnownHostsFile=~/.ssh_known_hosts .env.prod "$USER@$HOST:$DIR/.env"
+          echo "$GHCR_TOKEN" | $SSH "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+          sed "s/{\$DOMAIN}/$DOMAIN/" Caddyfile | $SSH "cat > /etc/caddy/pizza-playground.caddy && systemctl reload caddy"
+          $SSH "cd $DIR && docker compose pull api mock-gateway web && docker compose up -d --no-build --remove-orphans && docker image prune -f"
+      - if: always()
+        run: rm -f ~/.ssh_key .env.prod
