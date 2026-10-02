@@ -1,0 +1,19 @@
+# VPS overrides: run the images CI pushed to GHCR, listen on 127.0.0.1 only (the host Caddy
+# is the public entry), and come back up after a reboot.
+# Used as: docker compose -f docker-compose.yml -f docker-compose.prod.yml
+services:
+  db:
+    ports: !reset []
+    restart: unless-stopped
+  api:
+    image: ghcr.io/syamilu/pizza-playground/api:${IMAGE_TAG:-latest}
+    ports: !override ["127.0.0.1:8080:8080"]
+    restart: unless-stopped
+  mock-gateway:
+    image: ghcr.io/syamilu/pizza-playground/mock-gateway:${IMAGE_TAG:-latest}
+    ports: !override ["127.0.0.1:8090:8090"]
+    restart: unless-stopped
+  web:
+    image: ghcr.io/syamilu/pizza-playground/web:${IMAGE_TAG:-latest}
+    ports: !override ["127.0.0.1:3000:3000"]
+    restart: unless-stopped

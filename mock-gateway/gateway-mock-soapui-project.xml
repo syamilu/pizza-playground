@@ -76,7 +76,7 @@ bills[id] = [
     redirectUrl: req.redirectUrl,
     callbackUrl: req.callbackUrl]
 log.info("created " + id + " for order " + orderId + " amount " + bills[id].amount)
-requestContext.body = JsonOutput.toJson([id: id, url: "http://localhost:8090/pay/" + id])
+requestContext.body = JsonOutput.toJson([id: id, url: (System.getenv("PUBLIC_GATEWAY_URL") ?: "http://localhost:8090") + "/pay/" + id])
 return "Created"
 ]]></con:dispatchPath>
       <con:response name="Created" httpResponseStatus="200" mediaType="application/json">

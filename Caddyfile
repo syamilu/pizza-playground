@@ -1,0 +1,22 @@
+# Site block for the host Caddy (systemd). CI copies it to /etc/caddy/pizza-playground.caddy,
+# fills in the domain, and reloads Caddy. The app ports listen on 127.0.0.1 only.
+{$DOMAIN} {
+	handle /api/* {
+		reverse_proxy localhost:8080
+	}
+	handle /swagger-ui* {
+		reverse_proxy localhost:8080
+	}
+	handle /v3/api-docs* {
+		reverse_proxy localhost:8080
+	}
+	handle /actuator/health {
+		reverse_proxy localhost:8080
+	}
+	handle /pay/* {
+		reverse_proxy localhost:8090
+	}
+	handle {
+		reverse_proxy localhost:3000
+	}
+}
