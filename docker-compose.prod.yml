@@ -17,3 +17,35 @@ services:
     image: ghcr.io/syamilu/pizza-playground/web:${IMAGE_TAG:-latest}
     ports: !override ["127.0.0.1:3000:3000"]
     restart: unless-stopped
+
+  # Metrics agents for the laptop monitoring stack (monitoring/). They listen on 127.0.0.1
+  # only; monitoring/tunnel.sh forwards them over SSH.
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    command: ["--path.rootfs=/host"]
+    pid: host
+    volumes: ["/:/host:ro,rslave"]
+    ports: ["127.0.0.1:9100:9100"]
+    restart: unless-stopped
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    command: ["--docker_only=true", "--housekeeping_interval=10s"]
+    privileged: true
+    devices: ["/dev/kmsg"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports: ["127.0.0.1:8081:8080"]
+    restart: unless-stopped
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+    environment:
+      DATA_SOURCE_URI: db:5432/${POSTGRES_DB:-playground}?sslmode=disable
+      DATA_SOURCE_USER: ${POSTGRES_USER:-playground}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD:-playground}
+    ports: ["127.0.0.1:9187:9187"]
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped

@@ -13,7 +13,9 @@ spring:
     connect-timeout: 2s
     read-timeout: 10s
 management:
-  endpoints.web.exposure.include: health
+  # /actuator/prometheus is for the monitoring stack (monitoring/). The VPS Caddy does not route it.
+  endpoints.web.exposure.include: health,prometheus
+  metrics.distribution.percentiles-histogram.http.server.requests: true
 playground:
   jwt-secret: ${JWT_SECRET:change-me-but-it-works-as-is-0123456789abcdef}
   gateway-signature-key: ${GATEWAY_SIGNATURE_KEY:mock-signature-key}

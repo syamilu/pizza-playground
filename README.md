@@ -113,6 +113,11 @@ Base path `/api/v1`. Full schemas are in Swagger UI. Errors look like `{ "error"
 | `GET /admin/orders/history?from=&to=` | OWNER | Orders in a date range (UTC days) |
 | `POST /admin/reset[?full=true]` | OWNER | Reset the data |
 | `GET /actuator/health` (no `/api/v1`) | none | Health check |
+| `GET /actuator/prometheus` (no `/api/v1`) | none | Prometheus metrics. Not routed by the VPS Caddy |
+
+## Monitoring
+
+`monitoring/` has a laptop Prometheus and Grafana that watch the deployed VPS over an SSH tunnel, with k6 results on the same dashboard. The API exposes `/actuator/prometheus`, and the prod compose runs node-exporter, cAdvisor and postgres-exporter on `127.0.0.1`. See [`monitoring/README.md`](monitoring/README.md).
 
 ## Repo layout
 
@@ -124,6 +129,7 @@ pizza-playground/
 ├── web/                      Next.js 15 shop and admin UI
 ├── mock-gateway/             SoapUI mock payment gateway (project XML and Dockerfile)
 ├── test-data/customers.csv   customer logins for load tests
+├── monitoring/               laptop Prometheus + Grafana for watching the VPS
 ├── scripts/smoke.sh          end-to-end smoke test against a running stack
 ├── .github/workflows/        CI: boots the stack and runs the smoke test
 └── docs/                     design spec
