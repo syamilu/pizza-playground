@@ -1,0 +1,14 @@
+# Targets are the laptop ends of the SSH tunnel (monitoring/tunnel.sh).
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: api
+    metrics_path: /actuator/prometheus
+    static_configs: [{ targets: ["host.docker.internal:18080"] }]
+  - job_name: node
+    static_configs: [{ targets: ["host.docker.internal:19100"] }]
+  - job_name: cadvisor
+    static_configs: [{ targets: ["host.docker.internal:18081"] }]
+  - job_name: postgres
+    static_configs: [{ targets: ["host.docker.internal:19187"] }]
