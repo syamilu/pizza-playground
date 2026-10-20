@@ -109,7 +109,7 @@ jobs:
           ENV
           scp -i ~/.ssh_key -o UserKnownHostsFile=~/.ssh_known_hosts .env.prod "$USER@$HOST:$DIR/.env"
           echo "$GHCR_TOKEN" | $SSH "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
-          sed "s/{\$DOMAIN}/$DOMAIN/" Caddyfile | $SSH "cat > /etc/caddy/pizza-playground.caddy && systemctl reload caddy"
+          sed "s/{\$DOMAIN}/$DOMAIN/" Caddyfile | $SSH "sudo tee /etc/caddy/pizza-playground.caddy > /dev/null && sudo systemctl reload caddy"
           $SSH "cd $DIR && docker compose pull api mock-gateway web && docker compose up -d --no-build --remove-orphans && docker image prune -f"
       - if: always()
         run: rm -f ~/.ssh_key .env.prod
