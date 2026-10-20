@@ -19,17 +19,23 @@ services:
     restart: unless-stopped
 
   # Metrics agents for the laptop monitoring stack (monitoring/). They listen on 127.0.0.1
-  # only; monitoring/tunnel.sh forwards them over SSH.
+  # only; monitoring/tunnel.sh forwards them over SSH. mem_limit keeps a misbehaving agent from
+# starving the app on the 2 GB VPS.
   node-exporter:
     image: prom/node-exporter:v1.9.1
     command: ["--path.rootfs=/host"]
     pid: host
     volumes: ["/:/host:ro,rslave"]
     ports: ["127.0.0.1:9100:9100"]
+    mem_limit: 64m
     restart: unless-stopped
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.52.1
-    command: ["--docker_only=true", "--housekeeping_interval=10s"]
+    # only cpu, memory and network are left on; the dashboard uses nothing else
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=10s
+      - --disable_metrics=advtcp,cpu_topology,cpuset,disk,diskIO,hugetlb,memory_numa,percpu,perf_event,process,referenced_memory,resctrl,sched,tcp,udp
     privileged: true
     devices: ["/dev/kmsg"]
     volumes:
@@ -38,6 +44,7 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
     ports: ["127.0.0.1:8081:8080"]
+    mem_limit: 128m
     restart: unless-stopped
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
@@ -46,6 +53,7 @@ services:
       DATA_SOURCE_USER: ${POSTGRES_USER:-playground}
       DATA_SOURCE_PASS: ${POSTGRES_PASSWORD:-playground}
     ports: ["127.0.0.1:9187:9187"]
+    mem_limit: 64m
     depends_on:
       db: { condition: service_healthy }
     restart: unless-stopped
